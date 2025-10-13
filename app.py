@@ -1,3 +1,4 @@
+# app.py
 import streamlit as st
 import pandas as pd
 from log_parser import parse_log_file
@@ -12,15 +13,34 @@ st.set_page_config(
 
 # --- Sidebar ---
 with st.sidebar:
-    st.title("Hirata Log Analyzer")
-    st.write("---")
+    st.title("🤖 Hirata Log Analyzer")
+    
     uploaded_file = st.file_uploader(
         "Upload your Hirata Log File (.txt or .log)",
         type=['txt', 'log']
     )
-    st.info("This app parses Hirata SECS/GEM logs to extract KPIs and event data.")
 
-# --- Main Page ---
+    st.write("---")
+
+    # --- NEW: Explanations Section ---
+    st.header("About This App")
+    st.info(
+        "This application analyzes Hirata equipment log files to provide actionable "
+        "engineering insights into job performance and equipment reliability."
+    )
+
+    with st.expander("Metric Definitions"):
+        st.markdown("""
+        *   **Job Status:** Indicates if a `LOADSTART` or `UNLOADSTART` job was found and completed within the log file.
+        *   **Lot ID:** The unique identifier for the batch of material being processed.
+        *   **Total Panels:** The number of panels specified in the job command.
+        *   **Job Duration:** The total time from the job start command to the job completion event.
+        *   **Avg Cycle Time:** The `Job Duration` divided by `Total Panels`. A high-level indicator of overall performance.
+        *   **Takt Time / Cycle Time:** The specific time taken to process a single panel (e.g., the time between `LoadedToTool` event #1 and #2). A rising Takt Time is a key indicator of a bottleneck.
+        *   **Std. Deviation:** A measure of the consistency of the Takt Time. A low number means the process is stable; a high number indicates erratic performance.
+        """)
+
+# --- Main Page Display ---
 if uploaded_file:
     with st.spinner("Analyzing log file..."):
         parsed_events = parse_log_file(uploaded_file)
@@ -36,31 +56,26 @@ if uploaded_file:
     col4.metric("Job Duration (sec)", f"{summary['total_duration_sec']:.2f}")
     col5.metric("Avg Cycle Time (sec)", f"{summary['avg_cycle_time_sec']:.2f}")
 
-    # --- NEW: Takt Time Analysis Section ---
+    # --- Takt Time Analysis Section ---
     if not summary['takt_times_df'].empty:
         st.header("Panel-by-Panel Takt Time Analysis")
         st.markdown("---")
         
         takt_df = summary['takt_times_df']
         
-        # Display the line chart
         st.subheader("Cycle Time per Panel")
-        st.line_chart(takt_df, x='Panel #', y='Cycle Time (sec)')
+        st.line_chart(takt_df.set_index('Panel #'))
         
-        # Display key stats from the Takt time data
         st.subheader("Takt Time Statistics")
         col_stats1, col_stats2, col_stats3 = st.columns(3)
         col_stats1.metric("Min Cycle Time (sec)", f"{takt_df['Cycle Time (sec)'].min():.2f}")
         col_stats2.metric("Max Cycle Time (sec)", f"{takt_df['Cycle Time (sec)'].max():.2f}")
         col_stats3.metric("Std. Deviation", f"{takt_df['Cycle Time (sec)'].std():.2f}")
 
-    st.write("---")
-    
     # ... (Rest of the app remains the same) ...
+    st.write("---")
     st.header("Detailed Event Log")
     if parsed_events:
-        # ... (DataFrame display logic is unchanged) ...
-        # (This section is omitted for brevity but should be in your file)
         df = pd.json_normalize(parsed_events)
         if 'details.CEID' in df.columns:
             df['EventName'] = pd.to_numeric(df['details.CEID'], errors='coerce').map(CEID_MAP).fillna("Unknown Event")
