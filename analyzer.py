@@ -1,10 +1,45 @@
 # analyzer.py
+
 from datetime import datetime
+import pandas as pd
+
+def calculate_takt_times(events: list, start_index: int, end_index: int) -> pd.DataFrame:
+    """
+    Calculates the Takt time (cycle time) between each panel processing event.
+    
+    Args:
+        events: The full list of parsed events.
+        start_index: The list index of the LOADSTART event.
+        end_index: The list index of the completion event.
+
+    Returns:
+        A pandas DataFrame with panel numbers and their individual cycle times.
+    """
+    # Find all "LoadedToTool" events within the bounds of the job
+    load_events = [
+        e for e in events[start_index:end_index] 
+        if e.get('details', {}).get('CEID') == 127
+    ]
+
+    if len(load_events) < 2:
+        return pd.DataFrame() # Not enough data to calculate intervals
+
+    timestamps = [datetime.strptime(e['timestamp'], "%Y/%m/%d %H:%M:%S.%f") for e in load_events]
+    
+    # Calculate the time difference in seconds between each consecutive event
+    deltas = [(timestamps[i] - timestamps[i-1]).total_seconds() for i in range(1, len(timestamps))]
+
+    # Create a DataFrame for easy plotting
+    takt_df = pd.DataFrame({
+        'Panel #': range(2, len(timestamps) + 1), # Start from Panel 2
+        'Cycle Time (sec)': deltas
+    })
+    
+    return takt_df
 
 def analyze_data(events: list) -> dict:
     """
-    Analyzes a list of parsed events to calculate high-level KPIs for the first
-    complete job cycle found in the log.
+    Analyzes a list of parsed events to calculate high-level KPIs and Takt times.
     """
     summary = {
         "operators": set(),
@@ -17,66 +52,3 @@ def analyze_data(events: list) -> dict:
         "avg_cycle_time_sec": 0.0,
         "anomalies": [],
         "alarms": [],
-        "job_status": "No Job Found"
-    }
-
-    if not events:
-        return summary
-
-    # Find the index of the first LOADSTART command.
-    start_index = -1
-    for i, event in enumerate(events):
-        if event.get('details', {}).get('RCMD') == 'LOADSTART':
-            start_index = i
-            break
-    
-    # If a LOADSTART was found, populate what we know.
-    if start_index != -1:
-        loadstart_event = events[start_index]
-        summary['lot_id'] = loadstart_event['details'].get('LotID', 'N/A')
-        # Ensure panel_count is an integer
-        try:
-            summary['panel_count'] = int(loadstart_event['details'].get('PanelCount', 0))
-        except (ValueError, TypeError):
-             summary['panel_count'] = 0
-
-        summary['job_start_time'] = loadstart_event.get('timestamp')
-        summary['job_status'] = "Started but did not complete"
-
-        # Now, search FORWARD from that start point for the completion event.
-        end_index = -1
-        for i in range(start_index + 1, len(events)):
-            # A job can end with either LoadToToolCompleted or UnloadFromToolCompleted
-            if events[i].get('details', {}).get('CEID') in [131, 132]:
-                end_index = i
-                break
-        
-        # If a corresponding end event was found, calculate the duration.
-        if end_index != -1:
-            end_event = events[end_index]
-            summary['job_end_time'] = end_event.get('timestamp')
-            summary['job_status'] = "Completed"
-            
-            try:
-                t_start = datetime.strptime(summary['job_start_time'], "%Y/%m/%d %H:%M:%S.%f")
-                t_end = datetime.strptime(summary['job_end_time'], "%Y/%m/%d %H:%M:%S.%f")
-                duration = (t_end - t_start).total_seconds()
-
-                if duration >= 0:
-                    summary['total_duration_sec'] = round(duration, 2)
-                    if summary['panel_count'] > 0:
-                        summary['avg_cycle_time_sec'] = round(duration / summary['panel_count'], 2)
-            except (ValueError, TypeError):
-                summary['job_status'] = "Time Calculation Error"
-
-    # Aggregate other data across all events.
-    for event in events:
-        details = event.get('details', {})
-        if details.get('OperatorID'): summary['operators'].add(details['OperatorID'])
-        if details.get('MagazineID'): summary['magazines'].add(details['MagazineID'])
-        if str(details.get('Result', '')).startswith("Failure"):
-            summary['anomalies'].append(f"{event['timestamp']}: Host command failed.")
-        if details.get('AlarmID'):
-            summary['alarms'].append(f"{event['timestamp']}: Alarm {details['AlarmID']} occurred.")
-            
-    return summary
