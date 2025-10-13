@@ -1,21 +1,39 @@
 # app.py
 import streamlit as st
-from config import CEID_MAP
+import pandas as pd
 from log_parser import parse_log_file
-from analyzer import analyze_data
+from config import CEID_MAP
 
-st.set_page_config(page_title="Hirata Log Analyzer - Fresh Start", layout="wide")
-st.title("Hirata Equipment Log Analyzer - Step 1: Foundation")
+st.set_page_config(page_title="Hirata Log Analyzer - Parser Test", layout="wide")
+st.title("Hirata Equipment Log Analyzer - Step 2: Parser Validation")
 
-st.success("App structure is correct! All modules imported successfully.")
+uploaded_file = st.file_uploader("Upload your Hirata Log File (.txt or .log)", type=['txt', 'log'])
 
-st.subheader("Testing Imports:")
-st.write("`config.py` loaded:", "OK" if CEID_MAP else "Failed")
+if uploaded_file:
+    with st.spinner("Parsing log file..."):
+        parsed_events = parse_log_file(uploaded_file)
+    
+    st.header("Parser Output")
 
-parser_result = parse_log_file(None)
-st.write("`log_parser.py` loaded:", "OK" if parser_result else "Failed")
+    if parsed_events:
+        st.metric(label="Meaningful Events Found", value=len(parsed_events))
+        
+        # We will use json_normalize which is great for nested data
+        df = pd.json_normalize(parsed_events)
+        
+        if 'details.CEID' in df.columns:
+            df['EventName'] = pd.to_numeric(df['details.CEID'], errors='coerce').map(CEID_MAP).fillna("Unknown")
+        elif 'details.RCMD' in df.columns:
+            df['EventName'] = df['details.RCMD']
+        else:
+            df['EventName'] = "N/A"
 
-analyzer_result = analyze_data(None)
-st.write("`analyzer.py` loaded:", "OK" if analyzer_result else "Failed")
+        # Display all available columns
+        st.dataframe(df)
 
-st.info("We have a stable foundation. Ready to proceed to the next step.")
+        with st.expander("Show Raw JSON Output"):
+            st.json(parsed_events)
+    else:
+        st.warning("No meaningful events were found in the log file.")
+else:
+    st.info("Please upload a log file to begin analysis.")
