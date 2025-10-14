@@ -2,12 +2,35 @@
 from datetime import datetime
 import pandas as pd
 
+def perform_eda(df: pd.DataFrame) -> dict:
+    """
+    Performs Exploratory Data Analysis on the parsed log data.
+    """
+    eda_results = {}
+
+    # 1. Event Frequency Analysis
+    if 'EventName' in df.columns:
+        eda_results['event_counts'] = df['EventName'].value_counts()
+    else:
+        eda_results['event_counts'] = pd.Series()
+
+    # 2. Alarm Analysis
+    alarm_events = df[df['details.AlarmID'].notna()]
+    if not alarm_events.empty:
+        # Coerce to numeric, errors will become NaN which are then dropped
+        alarm_ids = pd.to_numeric(alarm_events['details.AlarmID'], errors='coerce').dropna()
+        eda_results['alarm_counts'] = alarm_ids.value_counts()
+        eda_results['alarm_table'] = alarm_events[['timestamp', 'EventName', 'details.AlarmID']]
+    else:
+        eda_results['alarm_counts'] = pd.Series()
+        eda_results['alarm_table'] = pd.DataFrame()
+        
+    return eda_results
+
 def analyze_data(events: list) -> dict:
     """
-    Final, robust analyzer. Tracks job KPIs, control state changes, and all other summary data.
+    Analyzes a list of parsed events to calculate high-level KPIs.
     """
-    # --- START OF HIGHLIGHTED FIX ---
-    # The summary dictionary is now correctly initialized with ALL possible keys.
     summary = {
         "operators": set(),
         "magazines": set(),
@@ -17,13 +40,8 @@ def analyze_data(events: list) -> dict:
         "job_end_time": "N/A",
         "total_duration_sec": 0.0,
         "avg_cycle_time_sec": 0.0,
-        "anomalies": [],
-        "alarms": [],
         "job_status": "No Job Found",
-        "takt_times_df": pd.DataFrame(),
-        "control_state_changes": [] # This key was missing before.
     }
-    # --- END OF HIGHLIGHTED FIX ---
 
     if not events:
         return summary
@@ -37,13 +55,13 @@ def analyze_data(events: list) -> dict:
         except (ValueError, TypeError):
              summary['panel_count'] = 0
         summary['job_start_time'] = start_event['timestamp']
-        summary['job_status'] = "Started but did not complete"
+        summary['job_status'] = "Started but not complete"
         start_index = events.index(start_event)
         end_event = next((e for e in events[start_index:] if e.get('details', {}).get('CEID') in [131, 132]), None)
         if end_event:
             summary['job_status'] = "Completed"
             try:
-                t_start = datetime.strptime(summary['job_start_time'], "%Y/%m/%d %H:%M:%S.%f")
+                t_start = datetime.strptime(start_event['timestamp'], "%Y/%m/%d %H:%M:%S.%f")
                 t_end = datetime.strptime(end_event['timestamp'], "%Y/%m/%d %H:%M:%S.%f")
                 duration = (t_end - t_start).total_seconds()
                 if duration >= 0:
@@ -53,23 +71,13 @@ def analyze_data(events: list) -> dict:
             except (ValueError, TypeError):
                 summary['job_status'] = "Time Calculation Error"
 
-    # Aggregate all other data
+    # Aggregate summary data (Operators, Magazines)
     for event in events:
         details = event.get('details', {})
         if details.get('OperatorID'): summary['operators'].add(details['OperatorID'])
         if details.get('MagazineID'): summary['magazines'].add(details['MagazineID'])
-        if str(details.get('Result', '')).startswith("Failure"):
-            summary['anomalies'].append(f"{event['timestamp']}: Host command failed.")
-        if details.get('AlarmID'):
-            summary['alarms'].append(f"{event['timestamp']}: Alarm {details['AlarmID']} occurred.")
-        
-        ceid = details.get('CEID')
-        if ceid == 12:
-            summary['control_state_changes'].append({"Timestamp": event['timestamp'], "State": "LOCAL"})
-        elif ceid == 13:
-            summary['control_state_changes'].append({"Timestamp": event['timestamp'], "State": "REMOTE"})
 
     if summary['job_status'] == "No Job Found":
-        summary['lot_id'] = "Test Lot"
+        summary['lot_id'] = "Test Lot / No Job"
             
     return summary
