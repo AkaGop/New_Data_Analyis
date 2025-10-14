@@ -4,50 +4,83 @@ import streamlit as st
 import pandas as pd
 from log_parser import parse_log_file
 from config import CEID_MAP
-from analyzer import analyze_data
+# analyzer.py now contains both analysis functions
+from analyzer import analyze_data, perform_eda 
 
-# --- START OF HIGHLIGHTED CHANGE ---
-# Added a version number to the title to act as a "cache buster"
-st.set_page_config(page_title="Hirata Log Analyzer v1.4", layout="wide")
-st.title("Hirata Equipment Log Analyzer v1.4")
-# --- END OF HIGHLIGHTED CHANGE ---
+st.set_page_config(page_title="Hirata Log Analyzer", layout="wide")
+st.title("Hirata Equipment Log Analyzer")
 
-uploaded_file = st.file_uploader("Upload your Hirata Log File (.txt or .log)", type=['txt', 'log'])
+# --- Sidebar ---
+with st.sidebar:
+    st.title("🤖 Log Analyzer")
+    uploaded_file = st.file_uploader("Upload Hirata Log File", type=['txt', 'log'])
+    st.write("---")
+    st.header("About")
+    st.info(
+        "This tool provides engineering analysis of Hirata SECS/GEM logs, "
+        "focusing on job performance, equipment states, and anomalies."
+    )
+    # The metric definitions from the previous correct version are still valid.
 
+# --- Main Page ---
 if uploaded_file:
     with st.spinner("Analyzing log file..."):
-        all_events = parse_log_file(uploaded_file)
-    meaningful_events = [event for event in all_events if 'details' in event]
-    summary_data = analyze_data(meaningful_events)
-    
-    st.header("Job Performance Dashboard")
-    col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("Job Status", summary_data['job_status'])
-    col2.metric("Lot ID", str(summary_data['lot_id']))
-    col3.metric("Total Panels", int(summary_data['panel_count']))
-    col4.metric("Job Duration (sec)", f"{summary_data['total_duration_sec']:.2f}")
-    col5.metric("Avg Cycle Time (sec)", f"{summary_data['avg_cycle_time_sec']:.2f}")
-
-    st.write("---")
-    st.header("Detailed Event Log")
-    if meaningful_events:
-        df = pd.json_normalize(meaningful_events)
+        parsed_events = parse_log_file(uploaded_file)
+        # Convert to DataFrame once, as it's used by multiple functions
+        df = pd.json_normalize(parsed_events)
+        
+        # Enrich the DataFrame with EventName
         if 'details.CEID' in df.columns:
             df['EventName'] = pd.to_numeric(df['details.CEID'], errors='coerce').map(CEID_MAP).fillna("Unknown")
-        elif 'details.RCMD' in df.columns:
-             df['EventName'] = df['details.RCMD']
+        if 'details.RCMD' in df.columns:
+            df.loc[df['EventName'].isnull(), 'EventName'] = df['details.RCMD']
+
+        # Perform analyses
+        summary = analyze_data(parsed_events)
+        eda_results = perform_eda(df)
+
+    # --- KPI Dashboard ---
+    st.header("Job Performance Dashboard")
+    st.markdown("---")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Job Status", summary['job_status'])
+    c2.metric("Lot ID", str(summary['lot_id']))
+    c3.metric("Total Panels", int(summary['panel_count']))
+    c4.metric("Job Duration (sec)", f"{summary['total_duration_sec']:.2f}")
+
+    # --- START OF HIGHLIGHTED ADDITION ---
+    
+    # --- Exploratory Data Analysis (EDA) Section ---
+    with st.expander("Show Exploratory Data Analysis (EDA)"):
+        st.subheader("Event Frequency")
+        if not eda_results['event_counts'].empty:
+            st.bar_chart(eda_results['event_counts'])
         else:
-             df['EventName'] = "Unknown"
+            st.info("No events to analyze for frequency.")
+
+        st.subheader("Alarm Analysis")
+        if not eda_results['alarm_counts'].empty:
+            st.write("Alarm Counts:")
+            st.bar_chart(eda_results['alarm_counts'])
+            st.write("Alarm Events Log:")
+            st.dataframe(eda_results['alarm_table'], use_container_width=True)
+        else:
+            st.success("✅ No Alarms Found in Log")
+            
+    # --- END OF HIGHLIGHTED ADDITION ---
+
+    # --- Detailed Log Table ---
+    st.header("Detailed Event Log")
+    if not df.empty:
         cols_in_order = [
             "timestamp", "msg_name", "EventName", "details.LotID", "details.PanelCount",
-            "details.MagazineID", "details.OperatorID", "details.PortID", "details.PortStatus",
-            "details.AlarmID"
+            "details.MagazineID", "details.OperatorID", "details.PortID", "details.PortStatus", "details.AlarmID"
         ]
         display_cols = [col for col in cols_in_order if col in df.columns]
-        st.dataframe(df[display_cols])
-        with st.expander("Show Raw JSON Data"):
-            st.json(meaningful_events)
+        st.dataframe(df[display_cols], hide_index=True)
     else:
-        st.warning("No meaningful parsed events were found.")
+        st.warning("No meaningful events were found in the log file.")
+
 else:
-    st.info("Please upload a log file to begin analysis.")
+    st.title("Welcome to the Hirata Log Analyzer")
+    st.info("⬅️ Please upload a log file using the sidebar to begin.")
