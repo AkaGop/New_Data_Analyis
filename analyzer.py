@@ -80,3 +80,4 @@ def analyze_data(events: list) -> dict:
             summary['alarms'].append(f"{event['timestamp']}: Alarm {details['AlarmID']} occurred.")
             
     return summary
+
