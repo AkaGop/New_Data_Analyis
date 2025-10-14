@@ -12,14 +12,13 @@ CEID_MAP = {
     181: "MagazineDocked", 182: "MagazineUndocked", 183: "RequestOperatorIdCheck",
     184: "RequestOperatorLogin", 185: "RequestMappingCheck",
 }
+
 RPTID_MAP = {
-    152: ['Timestamp', 'OperatorID'],
-    150: ['Timestamp', 'MagazineID'],
+    152: ['Timestamp', 'OperatorID'], 150: ['Timestamp', 'MagazineID'],
     151: ['Timestamp', 'PortID', 'MagazineID', 'OperatorID'],
     141: ['Timestamp', 'PortID', 'PortStatus'],
     120: ['Timestamp', 'LotID', 'PanelID', 'Orientation', 'ResultCode', 'SlotID'],
     121: ['Timestamp', 'LotID', 'PanelID', 'SlotID'],
     122: ['Timestamp', 'LotID', 'SourcePortID', 'DestPortID', 'PanelList'],
-    11:  ['Timestamp', 'ControlState'],
-    101: ['Timestamp', 'AlarmIDValue'],
+    11:  ['Timestamp', 'ControlState'], 101: ['Timestamp', 'AlarmIDValue'],
 }
