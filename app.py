@@ -1,3 +1,5 @@
+# app.py
+
 import streamlit as st
 import pandas as pd
 from log_parser import parse_log_file
@@ -12,13 +14,22 @@ st.set_page_config(
 
 # --- Sidebar ---
 with st.sidebar:
-    st.title("Hirata Log Analyzer")
+    st.title("🤖 Hirata Log Analyzer")
+    uploaded_file = st.file_uploader("Upload Log File", type=['txt', 'log'])
     st.write("---")
-    uploaded_file = st.file_uploader(
-        "Upload your Hirata Log File (.txt or .log)",
-        type=['txt', 'log']
+    st.header("About")
+    st.info(
+        "This tool provides engineering analysis of Hirata SECS/GEM logs, "
+        "focusing on job performance, equipment states, and anomalies."
     )
-    st.info("This app parses Hirata SECS/GEM logs to extract KPIs and event data.")
+    with st.expander("Metric Definitions"):
+        st.markdown("""
+        *   **Lot ID:** The unique ID for the batch of material. Defaults to 'Test Lot' if no production job is found.
+        *   **Total Panels:** The number of panels specified in the `LOADSTART` command.
+        *   **Job Duration:** Total time from `LOADSTART` to job completion.
+        *   **Avg Cycle Time:** The average time to process a single panel during the job.
+        *   **Control State Changes:** A log of when the equipment was switched between Host control (REMOTE) and operator control (LOCAL).
+        """)
 
 # --- Main Page ---
 if uploaded_file:
@@ -26,60 +37,43 @@ if uploaded_file:
         parsed_events = parse_log_file(uploaded_file)
         summary = analyze_data(parsed_events)
 
-    # --- KPI Dashboard ---
+    # --- KPI Dashboard (Now 4 columns) ---
     st.header("Job Performance Dashboard")
     st.markdown("---")
-    col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("Job Status", summary['job_status'])
-    col2.metric("Lot ID", str(summary['lot_id']))
-    col3.metric("Total Panels", summary['panel_count'])
-    col4.metric("Job Duration (sec)", f"{summary['total_duration_sec']:.2f}")
-    col5.metric("Avg Cycle Time (sec)", f"{summary['avg_cycle_time_sec']:.2f}")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Lot ID", str(summary['lot_id']))
+    col2.metric("Total Panels in Job", summary['panel_count'])
+    col3.metric("Job Duration (sec)", f"{summary['total_duration_sec']:.2f}")
+    col4.metric("Avg Cycle Time (sec)", f"{summary['avg_cycle_time_sec']:.2f}")
 
-    # --- NEW: Takt Time Analysis Section ---
-    if not summary['takt_times_df'].empty:
-        st.header("Panel-by-Panel Takt Time Analysis")
-        st.markdown("---")
-        
-        takt_df = summary['takt_times_df']
-        
-        # Display the line chart
-        st.subheader("Cycle Time per Panel")
-        st.line_chart(takt_df, x='Panel #', y='Cycle Time (sec)')
-        
-        # Display key stats from the Takt time data
-        st.subheader("Takt Time Statistics")
-        col_stats1, col_stats2, col_stats3 = st.columns(3)
-        col_stats1.metric("Min Cycle Time (sec)", f"{takt_df['Cycle Time (sec)'].min():.2f}")
-        col_stats2.metric("Max Cycle Time (sec)", f"{takt_df['Cycle Time (sec)'].max():.2f}")
-        col_stats3.metric("Std. Deviation", f"{takt_df['Cycle Time (sec)'].std():.2f}")
+    # --- Overall Log Summary ---
+    st.header("Overall Log Summary")
+    st.markdown("---")
+    colA, colB, colC, colD = st.columns([1, 1, 1, 2]) # Added a 4th column for state changes
+    
+    with colA:
+        st.subheader("Operators")
+        st.dataframe(pd.DataFrame(list(summary['operators']), columns=["ID"]), hide_index=True, use_container_width=True)
+    with colB:
+        st.subheader("Magazines")
+        st.dataframe(pd.DataFrame(list(summary['magazines']), columns=["ID"]), hide_index=True, use_container_width=True)
+    with colC:
+        st.subheader("State Changes")
+        if summary['control_state_changes']:
+            st.dataframe(pd.DataFrame(summary['control_state_changes']), hide_index=True, use_container_width=True)
+        else:
+            st.info("No Local/Remote changes detected.")
+    with colD:
+        st.subheader("Alarms & Anomalies")
+        if not summary['alarms'] and not summary['anomalies']:
+            st.success("✅ No Alarms or Anomalies Found")
+        else:
+            for alarm in summary['alarms']: st.warning(f"⚠️ {alarm}")
+            for anomaly in summary['anomalies']: st.error(f"❌ {anomaly}")
 
     st.write("---")
-    
     # ... (Rest of the app remains the same) ...
-    st.header("Detailed Event Log")
-    if parsed_events:
-        # ... (DataFrame display logic is unchanged) ...
-        # (This section is omitted for brevity but should be in your file)
-        df = pd.json_normalize(parsed_events)
-        if 'details.CEID' in df.columns:
-            df['EventName'] = pd.to_numeric(df['details.CEID'], errors='coerce').map(CEID_MAP).fillna("Unknown Event")
-        if 'details.RCMD' in df.columns:
-            df.loc[df['EventName'].isnull(), 'EventName'] = df['details.RCMD']
-        
-        cols_in_order = [
-            "timestamp", "msg_name", "EventName", "details.LotID", "details.PanelCount",
-            "details.MagazineID", "details.OperatorID", "details.PortID", "details.PortStatus",
-            "details.AlarmID"
-        ]
-        display_cols = [col for col in cols_in_order if col in df.columns]
-        st.dataframe(df[display_cols])
-
-        with st.expander("Show Raw JSON Data (for debugging)"):
-            st.json(parsed_events)
-    else:
-        st.warning("No meaningful events were found in the log file.")
-
+    
 else:
     st.title("Welcome to the Hirata Log Analyzer")
     st.info("⬅️ Please upload a log file using the sidebar to begin.")
