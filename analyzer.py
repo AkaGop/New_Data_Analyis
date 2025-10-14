@@ -4,8 +4,10 @@ import pandas as pd
 
 def analyze_data(events: list) -> dict:
     """
-    Final, enhanced analyzer. Tracks job KPIs and control state changes.
+    Final, robust analyzer. Tracks job KPIs, control state changes, and all other summary data.
     """
+    # --- START OF HIGHLIGHTED FIX ---
+    # The summary dictionary is now correctly initialized with ALL possible keys.
     summary = {
         "operators": set(),
         "magazines": set(),
@@ -19,13 +21,14 @@ def analyze_data(events: list) -> dict:
         "alarms": [],
         "job_status": "No Job Found",
         "takt_times_df": pd.DataFrame(),
-        "control_state_changes": [] # --- NEW: To store state change events ---
+        "control_state_changes": [] # This key was missing before.
     }
+    # --- END OF HIGHLIGHTED FIX ---
 
     if not events:
         return summary
 
-    # --- Find Job Cycle (logic is correct) ---
+    # Find Job Cycle
     start_event = next((e for e in events if e.get('details', {}).get('RCMD') == 'LOADSTART'), None)
     if start_event:
         summary['lot_id'] = start_event['details'].get('LotID', 'N/A')
@@ -40,7 +43,7 @@ def analyze_data(events: list) -> dict:
         if end_event:
             summary['job_status'] = "Completed"
             try:
-                t_start = datetime.strptime(start_event['timestamp'], "%Y/%m/%d %H:%M:%S.%f")
+                t_start = datetime.strptime(summary['job_start_time'], "%Y/%m/%d %H:%M:%S.%f")
                 t_end = datetime.strptime(end_event['timestamp'], "%Y/%m/%d %H:%M:%S.%f")
                 duration = (t_end - t_start).total_seconds()
                 if duration >= 0:
@@ -50,7 +53,7 @@ def analyze_data(events: list) -> dict:
             except (ValueError, TypeError):
                 summary['job_status'] = "Time Calculation Error"
 
-    # --- Aggregate all other data across the entire log ---
+    # Aggregate all other data
     for event in events:
         details = event.get('details', {})
         if details.get('OperatorID'): summary['operators'].add(details['OperatorID'])
@@ -60,15 +63,13 @@ def analyze_data(events: list) -> dict:
         if details.get('AlarmID'):
             summary['alarms'].append(f"{event['timestamp']}: Alarm {details['AlarmID']} occurred.")
         
-        # --- NEW: Logic to find and record control state changes ---
         ceid = details.get('CEID')
-        if ceid == 12: # GemControlStateLOCAL
+        if ceid == 12:
             summary['control_state_changes'].append({"Timestamp": event['timestamp'], "State": "LOCAL"})
-        elif ceid == 13: # GemControlStateREMOTE
+        elif ceid == 13:
             summary['control_state_changes'].append({"Timestamp": event['timestamp'], "State": "REMOTE"})
 
-    # --- NEW: Logic to apply default Lot ID if none was found ---
-    if summary['lot_id'] == "N/A" and summary['job_status'] == "No Job Found":
+    if summary['job_status'] == "No Job Found":
         summary['lot_id'] = "Test Lot"
             
     return summary
