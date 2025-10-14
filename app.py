@@ -5,32 +5,47 @@ from log_parser import parse_log_file
 from config import CEID_MAP
 from analyzer import analyze_data
 
-st.set_page_config(page_title="Hirata Log Analyzer", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="Hirata Log Analyzer vFINAL-5", layout="wide")
+st.title("Hirata Equipment Log Analyzer vFINAL-5")
 
-# --- Sidebar (unchanged) ---
+# --- Sidebar for Inputs ---
 with st.sidebar:
-    st.title("🤖 Hirata Log Analyzer")
-    # ... (rest of sidebar code is unchanged) ...
+    st.header("Upload Log File")
+    uploaded_file = st.file_uploader("Select a .txt or .log file", type=['txt', 'log'])
 
-# --- Main Page ---
-if uploaded_file:
-    # ... (parsing logic is unchanged) ...
+# --- Main Page Display ---
+if uploaded_file is not None:
+    with st.spinner("Analyzing log file..."):
+        events = parse_log_file(uploaded_file)
+        summary = analyze_data(events)
     
-    # --- START OF HIGHLIGHTED CHANGE ---
-    # Updated KPI Dashboard Layout
     st.header("Job Performance Dashboard")
-    st.markdown("---")
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Job Status", summary['job_status'])
+    c2.metric("Lot ID", str(summary['lot_id']))
+    c3.metric("Total Panels", int(summary['panel_count']))
+    c4.metric("Job Duration (sec)", f"{summary['total_duration_sec']:.2f}")
+    c5.metric("Avg Cycle Time (sec)", f"{summary['avg_cycle_time_sec']:.2f}")
     
-    col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("Control State", summary['control_state'])
-    col2.metric("Lot ID", str(summary['lot_id']))
-    col3.metric("Total Panels", summary['panel_count'])
-    col4.metric("Job Duration (sec)", f"{summary['total_duration_sec']:.2f}")
-    col5.metric("Avg Cycle Time (sec)", f"{summary['avg_cycle_time_sec']:.2f}")
-    # --- END OF HIGHLIGHTED CHANGE ---
-
-    # ... (the rest of the app display logic is unchanged) ...
-
+    st.write("---")
+    st.header("Detailed Event Log")
+    
+    if events:
+        df = pd.json_normalize(events)
+        if 'details.CEID' in df.columns:
+            df['EventName'] = pd.to_numeric(df['details.CEID'], errors='coerce').map(CEID_MAP).fillna("Unknown")
+        elif 'details.RCMD' in df.columns: 
+            df['EventName'] = df['details.RCMD']
+        else: 
+            df['EventName'] = "N/A"
+            
+        cols = ["timestamp", "msg_name", "EventName", "details.LotID", "details.PanelCount", "details.MagazineID", "details.OperatorID", "details.PortID", "details.PortStatus", "details.AlarmID"]
+        display_cols = [col for col in cols if col in df.columns]
+        st.dataframe(df[display_cols])
+        
+        with st.expander("Show Raw JSON Data"):
+            st.json(events)
+    else:
+        st.warning("No meaningful events were found.")
 else:
-    st.title("Welcome to the Hirata Log Analyzer")
-    st.info("⬅️ Please upload a log file using the sidebar to begin.")
+    st.info("Please upload a file to begin analysis.")
