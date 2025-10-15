@@ -1,4 +1,4 @@
-# app.py
+a_# app.py
 
 import streamlit as st
 import pandas as pd
@@ -42,7 +42,7 @@ if uploaded_file:
     with st.expander("Show Data Analysis"):
         st.subheader("Event Frequency")
         if not eda_results.get('event_counts', pd.Series()).empty:
-            st.bar_chart(results['event_counts'])
+            st.bar_chart(eda_results['event_counts'])
         else:
             st.info("No events to analyze for frequency.")
 
