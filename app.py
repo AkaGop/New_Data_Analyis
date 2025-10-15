@@ -5,7 +5,7 @@ from log_parser import parse_log_file
 from config import CEID_MAP
 from analyzer import analyze_data, perform_eda
 
-st.set_page_config(page_title="Hirata Log Analyzer - FINAL", layout="wide")
+st.set_page_config(page_title="Hirata Log Analyzer", layout="wide")
 st.title("Hirata Equipment Log Analyzer - FINAL")
 
 with st.sidebar:
