@@ -47,4 +47,4 @@ def perform_eda(df: pd.DataFrame) -> dict:
 
 # The analyze_data function is correct and does not need any changes.
 def analyze_data(events: list) -> dict:
-    # ... (code remains the same as previous step) ...
+    # ... (code remains the same as previous step) 
