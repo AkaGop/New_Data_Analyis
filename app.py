@@ -39,7 +39,7 @@ if uploaded_file:
     c4.metric("Avg Cycle Time (sec)", f"{summary.get('avg_cycle_time(sec)', 0.0):.2f}")
     # --- END OF HIGHLIGHTED CHANGE ---
     
-    with st.expander("Show Data Analysis"):
+    with st.expander("Show Exploratory Data Analysis (EDA)"):
         st.subheader("Event Frequency")
         if not eda_results.get('event_counts', pd.Series()).empty:
             st.bar_chart(eda_results['event_counts'])
