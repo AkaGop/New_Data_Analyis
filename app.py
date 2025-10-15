@@ -5,8 +5,8 @@ from log_parser import parse_log_file
 from config import CEID_MAP
 from analyzer import analyze_data, perform_eda
 
-st.set_page_config(page_title="Hirata Log Analyzer", layout="wide")
-st.title("Hirata Equipment Log Analyzer")
+st.set_page_config(page_title="Hirata Log Analyzer - FINAL", layout="wide")
+st.title("Hirata Equipment Log Analyzer - FINAL")
 
 with st.sidebar:
     st.title("🤖 Log Analyzer")
@@ -47,7 +47,6 @@ if uploaded_file:
         cols = ["timestamp", "msg_name", "EventName", "details.LotID", "details.PanelCount", "details.MagazineID", "details.OperatorID", "details.PortID", "details.PortStatus", "details.AlarmID"]
         display_cols = [col for col in cols if col in df.columns]
         st.dataframe(df[display_cols], hide_index=True)
-    else:
-        st.warning("No meaningful events were found.")
+    else: st.warning("No meaningful events were found.")
 else:
     st.title("Welcome"); st.info("⬅️ Please upload a log file to begin analysis.")
