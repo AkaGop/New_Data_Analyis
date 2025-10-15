@@ -1,7 +1,6 @@
 # analyzer.py
 from datetime import datetime
 import pandas as pd
-from config import ALARM_CODE_MAP
 
 def perform_eda(df: pd.DataFrame) -> dict:
     eda_results = {}
@@ -13,9 +12,8 @@ def perform_eda(df: pd.DataFrame) -> dict:
         alarm_events = df[df['details.AlarmID'].notna()].copy()
         if not alarm_events.empty:
             alarm_ids = pd.to_numeric(alarm_events['details.AlarmID'], errors='coerce').dropna()
-            alarm_events['AlarmText'] = alarm_ids.map(ALARM_CODE_MAP).fillna("Unknown Alarm ID")
-            eda_results['alarm_counts'] = alarm_events['AlarmText'].value_counts()
-            eda_results['alarm_table'] = alarm_events[['timestamp', 'EventName', 'details.AlarmID', 'AlarmText']]
+            eda_results['alarm_counts'] = alarm_ids.value_counts()
+            eda_results['alarm_table'] = alarm_events[['timestamp', 'EventName', 'details.AlarmID']]
         else:
             eda_results['alarm_counts'] = pd.Series(dtype='int64')
             eda_results['alarm_table'] = pd.DataFrame()
@@ -28,7 +26,8 @@ def analyze_data(events: list) -> dict:
     summary = {
         "operators": set(), "magazines": set(), "lot_id": "N/A", "panel_count": 0,
         "job_start_time": "N/A", "job_end_time": "N/A", "total_duration_sec": 0.0,
-        "avg_cycle_time_sec": 0.0, "job_status": "No Job Found", "control_state_changes": []
+        "avg_cycle_time_sec": 0.0, "job_status": "No Job Found",
+        "control_state_changes": []
     }
     if not events: return summary
     start_event = next((e for e in events if e.get('details', {}).get('RCMD') == 'LOADSTART'), None)
