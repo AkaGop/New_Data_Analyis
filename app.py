@@ -35,8 +35,8 @@ if uploaded_file:
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Lot ID", str(summary.get('lot_id', 'N/A')))
     c2.metric("Total Panels", int(summary.get('panel_count', 0)))
-    c3.metric("Job Duration (sec)", f"{summary.get('total_duration(sec)', 0.0):.2f}")
-    c4.metric("Avg Cycle Time (sec)", f"{summary.get('avg_cycle_time(sec)', 0.0):.2f}")
+    c3.metric("Job Duration (sec)", f"{summary.get('total_duration_sec', 0.0):.2f}")
+    c4.metric("Avg Cycle Time (sec)", f"{summary.get('avg_cycle_time_sec', 0.0):.2f}")
     # --- END OF HIGHLIGHTED CHANGE ---
     
     with st.expander("Show Exploratory Data Analysis (EDA)"):
