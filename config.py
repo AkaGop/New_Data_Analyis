@@ -1,6 +1,6 @@
 # config.py
 """
-Single source of truth for all static configuration data, knowledge bases, and report definitions.
+Single source of truth for all static configuration data.
 """
 CEID_MAP = {
     11: "Equipment Offline", 12: "Control State Local", 13: "Control State Remote",
@@ -13,20 +13,22 @@ CEID_MAP = {
     184: "RequestOperatorLogin", 185: "RequestMappingCheck",
 }
 RPTID_MAP = {
-    152: ['OperatorID'], 150: ['MagazineID'],
-    151: ['PortID', 'MagazineID', 'OperatorID'], 141: ['PortID', 'PortStatus'],
-    120: ['LotID', 'PanelID', 'Orientation', 'ResultCode', 'SlotID'],
-    121: ['LotID', 'PanelID', 'SlotID'],
-    122: ['LotID', 'SourcePortID', 'DestPortID', 'PanelList'],
-    11:  ['ControlState'], 101: ['AlarmIDValue'],
+    152: ['Timestamp', 'OperatorID'],
+    150: ['Timestamp', 'MagazineID'],
+    151: ['Timestamp', 'PortID', 'MagazineID', 'OperatorID'],
+    141: ['Timestamp', 'PortID', 'PortStatus'],
+    120: ['Timestamp', 'LotID', 'PanelID', 'Orientation', 'ResultCode', 'SlotID'],
+    121: ['Timestamp', 'LotID', 'PanelID', 'SlotID'],
+    122: ['Timestamp', 'LotID', 'SourcePortID', 'DestPortID', 'PanelList'],
+    11:  ['Timestamp', 'ControlState'],
+    101: ['Timestamp', 'AlarmIDValue'],
 }
-
-# --- START OF HIGHLIGHTED CHANGE ---
-# New dictionary mapping Alarm IDs (in decimal) to their descriptions.
-# Hex values from your CSV have been converted (e.g., 20F1 -> 8433).
 ALARM_CODE_MAP = {
     8433: "Port1-CLOC Memory Lost error",
     12289: "Port2-CLOC Memory Lost error",
-    # Add other alarms here as they become known
-    # Example: 102: "E-Stop Pressed" (this is a guess, not from the file)
+    102: "E-Stop Pressed", 
+    113: "Panel Mapping Sensor Error",
+    114: "Magazine Alignment Error",
+    18: "Communication Timeout with Host",
+    131: "Robot Arm Position Error",
 }
